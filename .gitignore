@@ -1,0 +1,6 @@
+# Build / test artifacts
+*.test
+*.out
+coverage.out
+cover.html
+/bin/

@@ -59,7 +59,7 @@ func NewPrimeField(p uint64) (Field, error) {
 	return primeField{p: p}, nil
 }
 
-func (f primeField) Modulus() uint64      { return f.p }
+func (f primeField) Modulus() uint64        { return f.p }
 func (f primeField) Reduce(x uint64) uint64 { return x % f.p }
 
 func (f primeField) Add(a, b uint64) uint64 {

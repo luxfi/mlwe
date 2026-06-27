@@ -97,12 +97,10 @@ func toInternal(p mlwe.Poly) poly {
 	return out
 }
 
-// writeBack copies a core poly into an mlwe.Poly's coefficient slice,
-// allocating if needed.
-func writeBack(src *poly, dst *mlwe.Poly) {
-	if len(dst.Coeffs) != mldsaN {
-		dst.Coeffs = make([]uint64, mldsaN)
-	}
+// writeBack copies a core poly into an mlwe.Poly's coefficient slice.
+// dst must have N coefficients (every dst here is either a caller poly
+// from NewPoly or one allocated by NewPoly inside this package).
+func writeBack(src *poly, dst mlwe.Poly) {
 	for i := 0; i < mldsaN; i++ {
 		dst.Coeffs[i] = uint64(src[i])
 	}
@@ -112,7 +110,7 @@ func writeBack(src *poly, dst *mlwe.Poly) {
 func (r *Ring) NTT(p mlwe.Poly) {
 	c := toInternal(p)
 	c.ntt()
-	writeBack(&c, &p)
+	writeBack(&c, p)
 }
 
 // INTT transforms p in place: NTT domain -> coefficient domain,
@@ -125,9 +123,13 @@ func (r *Ring) NTT(p mlwe.Poly) {
 // cancels the Montgomery product's R^-1 factor. See ring_test.go.
 func (r *Ring) INTT(p mlwe.Poly) {
 	c := toInternal(p)
+	// The forward NTT leaves coefficients unreduced (< 18q); the inverse
+	// NTT's additive branch would overflow uint32 on inputs that large,
+	// so reduce to < 2q first (the range the verbatim invNTT expects).
+	c.reduceLe2Q()
 	c.invNTT()
 	c.normalize()
-	writeBack(&c, &p)
+	writeBack(&c, p)
 }
 
 // Add sets dst = a + b, reduced into [0, q).
@@ -136,7 +138,7 @@ func (r *Ring) Add(dst, a, b mlwe.Poly) {
 	var out poly
 	out.add(&ca, &cb)
 	out.normalize()
-	writeBack(&out, &dst)
+	writeBack(&out, dst)
 }
 
 // Sub sets dst = a - b, reduced into [0, q). Inputs are reduced to < 2q
@@ -148,7 +150,7 @@ func (r *Ring) Sub(dst, a, b mlwe.Poly) {
 	var out poly
 	out.sub(&ca, &cb)
 	out.normalize()
-	writeBack(&out, &dst)
+	writeBack(&out, dst)
 }
 
 // MulNTT sets dst = a o b, the coefficient-wise Montgomery product of
@@ -161,7 +163,7 @@ func (r *Ring) MulNTT(dst, a, b mlwe.Poly) {
 	cb.reduceLe2Q()
 	var out poly
 	out.mulHat(&ca, &cb)
-	writeBack(&out, &dst)
+	writeBack(&out, dst)
 }
 
 // MatVec returns A*x over R_q for coefficient-domain A and x, result in
@@ -206,8 +208,8 @@ func (r *Ring) Power2Round(p mlwe.Poly) (r0, r1 mlwe.Poly) {
 		p1[i] = a1
 	}
 	r0, r1 = r.NewPoly(), r.NewPoly()
-	writeBack(&p0, &r0)
-	writeBack(&p1, &r1)
+	writeBack(&p0, r0)
+	writeBack(&p1, r1)
 	return r0, r1
 }
 
@@ -225,8 +227,8 @@ func (r *Ring) Decompose(p mlwe.Poly) (low, high mlwe.Poly) {
 		hi[i] = a1
 	}
 	low, high = r.NewPoly(), r.NewPoly()
-	writeBack(&lo, &low)
-	writeBack(&hi, &high)
+	writeBack(&lo, low)
+	writeBack(&hi, high)
 	return low, high
 }
 
@@ -238,7 +240,7 @@ func (r *Ring) HighBits(p mlwe.Poly) mlwe.Poly {
 		hi[i] = highBitsCoeff(modQ(c[i]), r.gamma2)
 	}
 	out := r.NewPoly()
-	writeBack(&hi, &out)
+	writeBack(&hi, out)
 	return out
 }
 
@@ -252,7 +254,7 @@ func (r *Ring) UseHint(hint, rp mlwe.Poly) mlwe.Poly {
 		out[i] = useHint(ch[i]&1, modQ(cr[i]), r.gamma2)
 	}
 	res := r.NewPoly()
-	writeBack(&out, &res)
+	writeBack(&out, res)
 	return res
 }
 

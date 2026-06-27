@@ -128,42 +128,6 @@ func (p *poly) mulHat(a, b *poly) {
 	}
 }
 
-// exceeds reports whether the centered-rep max-abs coefficient of p is
-// >= bound. Assumes p normalized. Leaks position-of-break (allowed
-// under FIPS 204 rejection sampling) but not the value.
-func (p *poly) exceeds(bound uint32) bool {
-	for i := 0; i < mldsaN; i++ {
-		x := int32((mldsaQ-1)/2) - int32(p[i])
-		x ^= x >> 31
-		x = int32((mldsaQ-1)/2) - x
-		if uint32(x) >= bound {
-			return true
-		}
-	}
-	return false
-}
-
-// power2Round splits p into p0PlusQ and p1 per FIPS 204 Power2Round.
-// Requires p normalized.
-func (p *poly) power2Round(p0PlusQ, p1 *poly) {
-	for i := 0; i < mldsaN; i++ {
-		p0PlusQ[i], p1[i] = power2round(p[i])
-	}
-}
-
-// polyDotHat sets p = sum_i a[i] * b[i] pointwise in Montgomery form.
-func polyDotHat(p *poly, a, b []poly) {
-	if len(a) != len(b) {
-		panic("mldsa: polyDotHat length mismatch")
-	}
-	var t poly
-	*p = poly{}
-	for i := range a {
-		t.mulHat(&a[i], &b[i])
-		p.add(&t, p)
-	}
-}
-
 // nttZetas: powers of the 512th root of unity zeta=1753 in Montgomery
 // form per FIPS 204 §3.6. Byte-identical to circl's Zetas.
 var nttZetas = [mldsaN]uint32{
@@ -284,18 +248,6 @@ func (p *poly) invNTT() {
 	for j := 0; j < mldsaN; j++ {
 		p[j] = montReduceLe2Q(mldsaROver256 * uint64(p[j]))
 	}
-}
-
-// centeredLowBits returns the FIPS Decompose low part of a, centered
-// into (-gamma2, gamma2]. a must be normalized to [0, q). Lifted from
-// pulsar/boundary.go.
-func centeredLowBits(a uint32, gamma2 uint32) int32 {
-	a0plusQ, _ := decompose(a, gamma2)
-	a0 := int32(a0plusQ)
-	if a0plusQ > (mldsaQ-1)/2 {
-		a0 -= mldsaQ
-	}
-	return a0
 }
 
 // highBitsCoeff returns the FIPS Decompose high part a1 of a.

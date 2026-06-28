@@ -160,14 +160,27 @@ func checkPoints(xs []uint64) error {
 	return nil
 }
 
-// readFieldElement reads 8 bytes from r and reduces them into f. The
-// modulus is < 2^32, so reducing a uniform 64-bit draw gives a
-// distribution whose bias from uniform on [0, p) is below 2^-32 — well
-// past any cryptographic relevance for sharing coefficients.
+// readFieldElement returns one field element drawn uniformly from [0, p)
+// by rejection sampling over 8-byte big-endian blocks. A block is kept
+// only if it is below the largest multiple of p that fits in 64 bits;
+// blocks at or above that bound are discarded, so the result carries no
+// modulo bias for any p < 2^63 (and the masking coefficients in Split are
+// therefore exactly uniform, giving t-1 shares perfect — information-
+// theoretic — independence from the secret). Because p < 2^63 the
+// rejection probability is below 1/2, so this terminates after fewer than
+// two blocks in expectation on any well-behaved reader. For cryptographic
+// sharing pass crypto/rand; for deterministic sharing pass a fixed XOF
+// stream.
 func readFieldElement(r io.Reader, f Field) (uint64, error) {
+	p := f.Modulus()
+	limit := (^uint64(0) / p) * p // largest multiple of p that is < 2^64
 	var buf [8]byte
-	if _, err := io.ReadFull(r, buf[:]); err != nil {
-		return 0, err
+	for {
+		if _, err := io.ReadFull(r, buf[:]); err != nil {
+			return 0, err
+		}
+		if u := binary.BigEndian.Uint64(buf[:]); u < limit {
+			return u % p, nil
+		}
 	}
-	return f.Reduce(binary.BigEndian.Uint64(buf[:])), nil
 }

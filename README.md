@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="mlwe" width="880"></p>
+
 # mlwe — shared Module-LWE base for Lux post-quantum signatures
 
 `github.com/luxfi/mlwe` is the common cryptographic substrate beneath the
